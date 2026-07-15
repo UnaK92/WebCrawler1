@@ -35,51 +35,63 @@ public class ParCrawler {
 
         long startTime = System.currentTimeMillis();
 
+        //Thread-safe collections + queue
         Set<String> visited = ConcurrentHashMap.newKeySet();
         Set<String> seen = ConcurrentHashMap.newKeySet();
         Set<String> workingLinks = ConcurrentHashMap.newKeySet();
         Set<String> brokenLinks = ConcurrentHashMap.newKeySet();
         Map<String, Set<String>> foundOnPage = new ConcurrentHashMap<>();
         ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
-        AtomicInteger activeWorkers = new AtomicInteger(0);
+        AtomicInteger activeWorkers = new AtomicInteger(0); //Active worker counter
         AtomicInteger processedCount = new AtomicInteger(0);
 
         queue.add(inputURL);
         seen.add(inputURL);
 
-        final int NUM_THREADS = 2;
+        //Number of threads + array with references
+        final int NUM_THREADS = 4;
         Thread[] workers = new Thread[NUM_THREADS];
 
+        //Creation of worker threads
         for (int i = 0; i < NUM_THREADS; i++) {
             workers[i] = new Thread(() -> {
 
                 while (true) {
                     String currentURL = queue.poll();
 
+                    //If queue is empty & no worker is processing a page stop
                     if (currentURL == null) {
                         if (queue.isEmpty() && activeWorkers.get() == 0) {
                             break;
                         }
-                        try { Thread.sleep(20); } catch (InterruptedException ignored) {}
+
+                        //If queue is empty, but another thread is working wait
+                        try { Thread.sleep(20);
+                        } catch (InterruptedException ignored) {}
                         continue;
                     }
 
+                    //Automatically mark URLs as visited
                     if (!visited.add(currentURL)) {
                         continue;
                     }
 
+                    //Print every 100 processed pages
                     int count = processedCount.incrementAndGet();
                     if (count % 100 == 0) {
                         System.out.println("Processed " + count + " pages");
                     }
 
+                    //Mark worker as active
                     activeWorkers.incrementAndGet();
 
+                    //Convert string URL into java URL object, with no connection currently and -1 response code (no code received)
                     try {
                         URL objURL = new URL(currentURL);
                         HttpURLConnection conn = null;
                         int code = -1;
 
+                        //Try to connect to each URL up to 3 times, URL & HTTP connection creation + request
                         for (int attempt = 1; attempt <= 3; attempt++) {
                             try {
                                 conn = (HttpURLConnection) objURL.openConnection();
@@ -100,7 +112,7 @@ public class ParCrawler {
                             }
                         }
 
-
+                        //Read HTTP response code & sorting into sets
                         HttpStatus status = HttpStatus.getStatusFromCode(code);
 
                         if (code >= 200 && code < 400) {
@@ -110,6 +122,7 @@ public class ParCrawler {
                             continue;
                         }
 
+                        //Check if it's HTML, read it & combine it
                         String type = conn.getContentType();
                         if (type == null || !type.toLowerCase().contains("text/html")) {
                             continue;
@@ -123,6 +136,7 @@ public class ParCrawler {
                         }
                         reader.close();
 
+                        //Search HTML for links & process them
                         Matcher matcher = hrefPattern.matcher(html.toString());
                         while (matcher.find()) {
                             String href = matcher.group(1).trim();
@@ -135,6 +149,7 @@ public class ParCrawler {
                                 continue;
                             }
 
+                            //Converting relative to absolute links
                             URL absolute;
                             try {
                                 absolute = new URL(objURL, href);
@@ -142,20 +157,24 @@ public class ParCrawler {
                                 continue;
                             }
 
+                            //Only allow HTTP & HTTPS
                             String protocol = absolute.getProtocol();
                             if (!protocol.equals("http") && !protocol.equals("https")) {
                                 continue;
                             }
 
+                            //Keep crawler inside the domain
                             String host = absolute.getHost();
                             boolean inDomain = host.equalsIgnoreCase(host1) || host.equalsIgnoreCase(host2);
                             if (!inDomain) continue;
 
+                            //Convert URL object back to regular string + latest
                             String nextURL = absolute.toString();
                             if (nextURL.toLowerCase().contains("latest")) {
                                 continue;
                             }
 
+                            //Record on what page links were found & add new URLs to the queue
                             foundOnPage.computeIfAbsent(nextURL, k -> ConcurrentHashMap.newKeySet()).add(currentURL);
 
                             if (seen.add(nextURL)) {
@@ -166,18 +185,21 @@ public class ParCrawler {
                     } catch (Exception e) {
                         brokenLinks.add(currentURL + " (Error: " + e.getMessage() + ")");
                     } finally {
-                        activeWorkers.decrementAndGet();
+                        activeWorkers.decrementAndGet(); //Always after done decrease active worker count
                     }
                 }
             });
 
-            workers[i].start();
+            workers[i].start(); //Starting each thread
         }
 
+        //Wait for all workers to finish
         for (Thread t : workers) {
-            try { t.join(); } catch (InterruptedException ignored) {}
+            try { t.join();
+            } catch (InterruptedException ignored) {}
         }
 
+        //Total time calculation + writing out the report text file
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
 

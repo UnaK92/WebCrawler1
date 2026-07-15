@@ -31,11 +31,14 @@ public class SeqCrawler {
 
         long startTime = System.currentTimeMillis();
 
+        //Collections
         Set<String> visited = new HashSet<>();
         Set<String> seen = new HashSet<>();
         Set<String> workingLinks = new HashSet<>();
         Set<String> brokenLinks = new HashSet<>();
         Map<String, Set<String>> foundOnPage = new HashMap<>();
+
+        //BFS queue + add start URL
         Queue<String> queue = new ArrayDeque<>();
         queue.add(inputURL);
         seen.add(inputURL);
@@ -52,10 +55,12 @@ public class SeqCrawler {
             visited.add(currentURL);
             processedCount++;
 
+            //Print every 100 processed pages
             if (processedCount == 100 || (processedCount > 100 && processedCount % 100 == 0)) {
                 System.out.println("Processed " + processedCount + " pages.");
             }
 
+            //URL & HTTP connection creation + request
             try {
                 URL objURL = new URL(currentURL);
                 HttpURLConnection conn = (HttpURLConnection) objURL.openConnection();
@@ -63,6 +68,7 @@ public class SeqCrawler {
                 conn.setConnectTimeout(5000);
                 conn.setReadTimeout(5000);
 
+                //Read HTTP response code & sorting into sets
                 int code = conn.getResponseCode();
                 HttpStatus status = HttpStatus.getStatusFromCode(code);
 
@@ -73,6 +79,7 @@ public class SeqCrawler {
                     continue;
                 }
 
+                //Check if it's HTML, read it & combine it
                 String type = conn.getContentType();
                 if (type == null || !type.toLowerCase().contains("text/html")) {
                     continue;
@@ -88,6 +95,7 @@ public class SeqCrawler {
 
                 reader.close();
 
+                //Search HTML for links & process them
                 Matcher matcher = hrefPattern.matcher(html.toString());
 
                 while (matcher.find()) {
@@ -101,6 +109,7 @@ public class SeqCrawler {
                         continue;
                     }
 
+                    //Converting relative to absolute links
                     URL absolute;
                     try {
                         absolute = new URL(objURL, href);
@@ -108,24 +117,34 @@ public class SeqCrawler {
                         continue;
                     }
 
+                    //Only allow HTTP & HTTPS
                     String protocol = absolute.getProtocol();
                     if (!protocol.equals("http") && !protocol.equals("https")) {
                         continue;
                     }
 
+                    //Keep crawler inside the domain
                     String host = absolute.getHost();
                     boolean inDomain = host.equalsIgnoreCase(host1) || host.equalsIgnoreCase(host2);
                     if (!inDomain) {
                         continue;
                     }
 
+                    //Convert URL object back to regular string
                     String nextURL = absolute.toString();
 
+                    //Ignore latest because of the infinite latest loop
                     if (nextURL.toLowerCase().contains("latest")) {
                         continue;
                     }
 
-                    foundOnPage.computeIfAbsent(nextURL, k -> new HashSet<>()).add(currentURL);
+                    //Record on what page links were found & add new URLs to the queue
+                    if (!foundOnPage.containsKey(nextURL)) {
+                        foundOnPage.put(nextURL, new HashSet<>());
+                    }
+
+                    foundOnPage.get(nextURL).add(currentURL);
+                   // foundOnPage.computeIfAbsent(nextURL, k -> new HashSet<>()).add(currentURL);
 
                     if (!seen.contains(nextURL)) {
                         seen.add(nextURL);
@@ -138,6 +157,7 @@ public class SeqCrawler {
             }
         }
 
+        //Total time calculation + writing out the report text file
         long endTime = System.currentTimeMillis();
         long totalTime = endTime - startTime;
         String outputPath = "WebCrawlerLogs/WebcrawlerSeq.txt";

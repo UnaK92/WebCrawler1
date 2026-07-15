@@ -10,7 +10,6 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.File;
-//import java.util.Scanner;
 
 public class DistCrawler {
 
@@ -25,7 +24,7 @@ public class DistCrawler {
     private static final int work = 1;
     private static final int stop = 0;
 
-   // private static final int maxPages = 20;
+   // private static final int maxPages = 20; this was used for limiting the testing
 
     private static final String startURL1 = "https://www.famnit.upr.si";
     private static final String startURL2 = "https://www.famnit.upr.si/";
@@ -37,10 +36,10 @@ public class DistCrawler {
 
     public static void main(String[] args) {
 
-        args = MPI.Init(args); // start MPI
+        args = MPI.Init(args); // Start MPI
 
-        int rank = MPI.COMM_WORLD.Rank(); // unique rank of current process
-        int size = MPI.COMM_WORLD.Size(); // total number of processes
+        int rank = MPI.COMM_WORLD.Rank(); // Unique rank of current process
+        int size = MPI.COMM_WORLD.Size(); // Total number of processes
 
         if (size < 2) {
             if (rank == 0) {
@@ -51,24 +50,22 @@ public class DistCrawler {
             return;
         }
 
+        //Master is always rank 0, while workers are all other ranks
         if (rank == 0) {
             runMaster(size, args);
         } else {
             runWorker(rank);
         }
 
-        MPI.Finalize(); // finish MPI
+        MPI.Finalize(); // Finish MPI
     }
 
-    private static void runMaster(int numOfProcesses, String[] args) {
+    private static void runMaster(int numOfProcesses, String[] args) { //Master function
 
         System.out.println("Running Master");
         System.out.println("Number of Workers: " + (numOfProcesses - 1));
 
-        /*Scanner scanner = new Scanner(System.in);
-        System.out.println("Please enter the starting URL: ");
-        String startURL = scanner.nextLine().trim();*/
-
+        //No arguments - send stop signal to workers
         if (args.length == 0) {
             System.out.println("Please provide the starting URL.");
             for (int workerRank = 1; workerRank < numOfProcesses; workerRank++) {
@@ -81,6 +78,7 @@ public class DistCrawler {
 
         String startURL = args[0].trim();
 
+        //Invalid start URL - send stop signal to workers
         if (!startURL.equals(startURL1) && !startURL.equals(startURL2)) {
             System.out.println("Invalid URL.");
             for (int workerRank = 1; workerRank < numOfProcesses; workerRank++) {
@@ -90,10 +88,10 @@ public class DistCrawler {
                 );
             }
 
-            //scanner.close();
             return;
         }
 
+        //Collections + queue
         long startTime = System.currentTimeMillis();
 
         Queue<String> queue = new ArrayDeque<>();
@@ -107,20 +105,23 @@ public class DistCrawler {
         queue.add(startURL);
         seen.add(startURL);
 
-        int processedPages = 0;
-        int[] workerProcessedPages = new int[numOfProcesses];
+        int processedPages = 0; //Total number of pages
+        int[] workerProcessedPages = new int[numOfProcesses]; //Separate count for every worker
 
         while (true) {
+            //Tracking workers for the current round
             int[] assignedWorkers = new int[numOfProcesses];
             String[] assignedURLs = new String[numOfProcesses];
 
             int workersUsed = 0;
 
+            //Going through every worker, checking if URLs are available and removing them from queue
             for (int workerRank = 1; workerRank < numOfProcesses; workerRank++) {
                 if (!queue.isEmpty() /*&& processedPages + workersUsed < maxPages*/) {
 
                     String currentURL = queue.poll();
 
+                    //Creating the work command & sends it + sends the URL to the worker
                     int[] control = {work};
 
                     MPI.COMM_WORLD.Send(
@@ -129,12 +130,12 @@ public class DistCrawler {
 
                     sendString(currentURL, workerRank);
 
+                    //Master records the worker was used, stores the assigned URL and increases the number of workers
                     assignedWorkers[workerRank] = 1;
                     assignedURLs[workerRank] = currentURL;
-
                     workersUsed++;
 
-                   // System.out.println("Sent " + currentURL + " to worker " + workerRank);
+                   // System.out.println("Sent " + currentURL + " to worker " + workerRank); These SOUTs were used to check if different parts were working correctly during testing
                     if (currentURL.equals(startURL)) {
                         System.out.println("Sent starting URL to worker " + workerRank);
                     }
@@ -148,11 +149,12 @@ public class DistCrawler {
                 break;
             }
 
+            //Receive worker results
             for (int workerRank = 1; workerRank < numOfProcesses; workerRank++) {
                 if (assignedWorkers[workerRank] == 0) {
                     continue;
                 }
-
+                //Create receiving arraysfv
                 int[] statusCode = new int[1];
                 int[] linkCount = new int[1];
                 int[] linksLength = new int[1];
@@ -177,12 +179,14 @@ public class DistCrawler {
                     );
                 }
 
+                //Rebuilding link string
                 StringBuilder linksBuilder = new StringBuilder();
 
                 for (int character : linksCharacters) {
                     linksBuilder.append((char) character);
                 }
 
+                //Creating the received-link set, separating individual URLs & adding to the set
                 String receivedLinksString = linksBuilder.toString();
                 Set<String> receivedLinks = new HashSet<>();
 
@@ -196,6 +200,7 @@ public class DistCrawler {
                     }
                 }
 
+                //Taking the processed URL, adding it to appropriate sets + status code separation
                 String processedURL = assignedURLs[workerRank];
 
                 visited.add(processedURL);
@@ -217,12 +222,14 @@ public class DistCrawler {
                 System.out.println("Status code: " + statusCode[0]);
                 System.out.println("Links found: " + linkCount[0]);*/
 
-                workerProcessedPages[workerRank]++;
+                workerProcessedPages[workerRank]++; //Inc number of processed pages for the worker
 
+                //Print every 100 processed pages
                 if (workerProcessedPages[workerRank] % 100 == 0) {
                     System.out.println("Worker " + workerRank + " processed " + workerProcessedPages[workerRank] + " links");
                 }
 
+                //Record where each link was found
                 for (String link : receivedLinks) {
 
                     foundOnPage.computeIfAbsent(link, key -> new HashSet<>()).add(processedURL);
@@ -240,6 +247,7 @@ public class DistCrawler {
             }*/
         }
 
+        //Stopping workers at the end
         for (int workerRank = 1; workerRank < numOfProcesses; workerRank++) {
             int[] control = {stop};
 
@@ -260,14 +268,14 @@ public class DistCrawler {
         System.out.println("Working links: " + workingLinks.size());
         System.out.println("Broken links: " + brokenLinks.size());
 
-        //scanner.close();
     }
 
-    private static void runWorker(int rank) {
+    private static void runWorker(int rank) { //Worker function
 
         System.out.println("Running Worker " + rank);
 
         while (true) {
+            //Receiving the control message, handling the stop command & receiving the URL
             int[] control = new int[1];
 
             MPI.COMM_WORLD.Recv(
@@ -282,10 +290,11 @@ public class DistCrawler {
             String receivedURL = receiveString();
 
             //System.out.println("Worker " + rank + " received " + receivedURL);
-
+            //Initial status and link set
             int[] statusCode = {-1};
             Set<String> foundLinks = new HashSet<>();
 
+            //Try to connect to each URL up to 3 times, URL & HTTP connection creation + request
             try {
                 URL url = new URL(receivedURL);
                 HttpURLConnection connection = null;
@@ -310,6 +319,7 @@ public class DistCrawler {
                     }
                 }
 
+                //Read HTTP response code & sorting into sets
                 if (statusCode[0] >= 200 && statusCode[0] < 400) {
 
                     String contentType = connection.getContentType();
@@ -322,7 +332,7 @@ public class DistCrawler {
                                                 connection.getInputStream()
                                         )
                                 );
-
+                        //Building the HTML string
                         StringBuilder html = new StringBuilder();
                         String line;
 
@@ -332,6 +342,7 @@ public class DistCrawler {
 
                         reader.close();
 
+                        //Searching for links
                         Matcher matcher = hrefPattern.matcher(html.toString());
 
                         while (matcher.find()) {
@@ -351,6 +362,7 @@ public class DistCrawler {
                                 continue;
                             }
 
+                            //Converting relative to absolute links
                             URL absoluteURL;
 
                             try {
@@ -359,12 +371,14 @@ public class DistCrawler {
                                 continue;
                             }
 
+                            //Only allow HTTP & HTTPS
                             String protocol = absoluteURL.getProtocol();
 
                             if (!protocol.equals("http") && !protocol.equals("https")) {
                                 continue;
                             }
 
+                            //Keep crawler inside the domain
                             String host = absoluteURL.getHost();
 
                             boolean inDomain =
@@ -374,6 +388,7 @@ public class DistCrawler {
                                 continue;
                             }
 
+                            //Convert URL object back to regular string + latest
                             String nextURL = absoluteURL.toString();
 
                             if (nextURL.toLowerCase().contains("latest")) {
@@ -391,8 +406,10 @@ public class DistCrawler {
                 System.out.println("Worker " + rank + " couldn't access the URL: " + e.getMessage());
             }
 
+            //Number of unique linsk found on the page stored in ana rray
             int[] linkCount = {foundLinks.size()};
 
+            //Joining links into a string
             StringBuilder linksBuilder = new StringBuilder();
 
             for (String link : foundLinks) {
@@ -400,6 +417,7 @@ public class DistCrawler {
                 linksBuilder.append("\n");
             }
 
+            //Converting links to character codes, filling the array + sending
             String linksString = linksBuilder.toString();
             int[] linksCharacters = new int[linksString.length()];
             int[] linksLength = {linksCharacters.length};
@@ -428,8 +446,9 @@ public class DistCrawler {
         }
     }
 
-    private static void sendString(String text, int destination) {
+    private static void sendString(String text, int destination) { //Sends a java string from master to worker
 
+        //Create character array & convert it into integers + send
         int[] textCharacters = new int[text.length()];
         int[] textLength = {textCharacters.length};
 
@@ -446,20 +465,22 @@ public class DistCrawler {
         );
     }
 
-    private static String receiveString() {
+    private static String receiveString() { //Worker receives the URL send by the master
 
+        //Receives the length
         int[] textLength = new int[1];
 
         MPI.COMM_WORLD.Recv(
                 textLength, 0, textLength.length, MPI.INT, 0, tagURLLength
         );
 
+        //Create the character array & receives the characters
         int[] textCharacters = new int[textLength[0]];
 
         MPI.COMM_WORLD.Recv(
-                textCharacters, 0, textCharacters.length, MPI.INT, 0, tagURL
-        );
+                textCharacters, 0, textCharacters.length, MPI.INT, 0, tagURL);
 
+        //Rebuilds the string
         StringBuilder textBuilder = new StringBuilder();
 
         for (int character : textCharacters) {
@@ -469,6 +490,7 @@ public class DistCrawler {
         return textBuilder.toString();
     }
 
+    //Function for writing out the text file at the end
     private static void writeReport(
             long totalTime,
             Set<String> visited,
