@@ -13,11 +13,11 @@ import java.util.regex.Pattern;
 
 public class ParCrawler {
 
-    private static final String startURL1 = "https://www.famnit.upr.si";
-    private static final String startURL2 = "https://www.famnit.upr.si/";
+    private static final String startURL1 = "https://www.old.famnit.upr.si/sl";
+    private static final String startURL2 = "https://www.old.famnit.upr.si/sl/";
 
-    private static final String host1 = "www.famnit.upr.si";
-    private static final String host2 = "famnit.upr.si";
+    private static final String host1 = "www.old.famnit.upr.si";
+    private static final String host2 = "old.famnit.upr.si";
 
     private static final Pattern hrefPattern = Pattern.compile("<a\\s+[^>]*href=\"([^\"]*)\"", Pattern.CASE_INSENSITIVE);
 
@@ -49,7 +49,7 @@ public class ParCrawler {
         seen.add(inputURL);
 
         //Number of threads + array with references
-        final int NUM_THREADS = 4;
+        final int NUM_THREADS = 8;
         Thread[] workers = new Thread[NUM_THREADS];
 
         //Creation of worker threads

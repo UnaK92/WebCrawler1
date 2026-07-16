@@ -10,11 +10,11 @@ import java.util.regex.Pattern;
 
 public class SeqCrawler {
 
-    private static final String startURL1 = "https://www.famnit.upr.si";
-    private static final String startURL2 = "https://www.famnit.upr.si/";
+    private static final String startURL1 = "https://www.old.famnit.upr.si/sl";
+    private static final String startURL2 = "https://www.old.famnit.upr.si/sl/";
 
-    private static final String host1 = "www.famnit.upr.si";
-    private static final String host2 = "famnit.upr.si";
+    private static final String host1 = "www.old.famnit.upr.si";
+    private static final String host2 = "old.famnit.upr.si";
 
     private static final Pattern hrefPattern = Pattern.compile("<a\\s+[^>]*href=\"([^\"]*)\"", Pattern.CASE_INSENSITIVE);
 
