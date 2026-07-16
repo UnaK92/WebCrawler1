@@ -1,1 +1,2 @@
-Run the distributed version in the command prompt in the directory path:\WebCrawler1\out\production\WebCrawler1> with "%MPJ_HOME%\bin\mpjrun.bat" -np 4 DistCrawler https://www.famnit.upr.si  
+Run the distributed version in the command prompt in the directory path:\WebCrawler1\out\production\WebCrawler1> with "%MPJ_HOME%\bin\mpjrun.bat" -np 4 DistCrawler https://www.famnit.upr.si (4 can be replaced with any number of wanted processes).
+Setup used: https://www.youtube.com/watch?v=p_SUbcf0nCk
