@@ -142,9 +142,7 @@ public class SeqCrawler {
                     if (!foundOnPage.containsKey(nextURL)) {
                         foundOnPage.put(nextURL, new HashSet<>());
                     }
-
                     foundOnPage.get(nextURL).add(currentURL);
-                   // foundOnPage.computeIfAbsent(nextURL, k -> new HashSet<>()).add(currentURL);
 
                     if (!seen.contains(nextURL)) {
                         seen.add(nextURL);
