@@ -61,15 +61,37 @@ public class SeqCrawler {
             }
 
             //URL & HTTP connection creation + request
+            HttpURLConnection conn = null;
             try {
                 URL objURL = new URL(currentURL);
-                HttpURLConnection conn = (HttpURLConnection) objURL.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
+                int code = -1;
+
+                for (int attempt  = 1; attempt <= 3; attempt++) {
+                    try {
+                        conn = (HttpURLConnection) objURL.openConnection();
+                        conn.setRequestMethod("GET");
+                        conn.setConnectTimeout(20000);
+                        conn.setReadTimeout(30000);
+
+                        code = conn.getResponseCode();
+                        break;
+                    } catch (Exception e) {
+                        if (conn != null) {
+                            conn.disconnect();
+                            conn = null;
+                        }
+
+                        if (attempt == 3) {
+                            throw e;
+                        }
+
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ignored) {}
+                    }
+                }
 
                 //Read HTTP response code & sorting into sets
-                int code = conn.getResponseCode();
                 HttpStatus status = HttpStatus.getStatusFromCode(code);
 
                 if (code >= 200 && code < 400) {
@@ -152,6 +174,10 @@ public class SeqCrawler {
 
             } catch (Exception e) {
                 brokenLinks.add(currentURL + " (Error: " + e.getMessage() + ")");
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
             }
         }
 

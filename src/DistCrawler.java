@@ -26,11 +26,11 @@ public class DistCrawler {
 
    // private static final int maxPages = 20; this was used for limiting the testing
 
-    private static final String startURL1 = "https://www.old.famnit.upr.si/sl";
-    private static final String startURL2 = "https://www.old.famnit.upr.si/sl/";
+    private static final String startURL1 = "https://www.famnit.upr.si";
+    private static final String startURL2 = "https://www.famnit.upr.si/";
 
-    private static final String host1 = "www.old.famnit.upr.si";
-    private static final String host2 = "old.famnit.upr.si";
+    private static final String host1 = "www.famnit.upr.si";
+    private static final String host2 = "famnit.upr.si";
 
     private static final Pattern hrefPattern = Pattern.compile("<a\\s+[^>]*href=\"([^\"]*)\"", Pattern.CASE_INSENSITIVE);
 
@@ -154,7 +154,7 @@ public class DistCrawler {
                 if (assignedWorkers[workerRank] == 0) {
                     continue;
                 }
-                //Create receiving arraysfv
+                //Create receiving arrays
                 int[] statusCode = new int[1];
                 int[] linkCount = new int[1];
                 int[] linksLength = new int[1];
@@ -294,27 +294,32 @@ public class DistCrawler {
             int[] statusCode = {-1};
             Set<String> foundLinks = new HashSet<>();
 
+            HttpURLConnection connection = null;
             //Try to connect to each URL up to 3 times, URL & HTTP connection creation + request
             try {
                 URL url = new URL(receivedURL);
-                HttpURLConnection connection = null;
 
                 for (int attempt = 1; attempt <=3; attempt++) {
                     try {
                         connection = (HttpURLConnection) url.openConnection();
                         connection.setRequestMethod("GET");
-                        connection.setConnectTimeout(10000);
-                        connection.setReadTimeout(15000);
+                        connection.setConnectTimeout(20000);
+                        connection.setReadTimeout(30000);
 
                         statusCode[0] = connection.getResponseCode();
                         break;
                     } catch (Exception e) {
+                        if (connection != null) {
+                            connection.disconnect();
+                            connection = null;
+                        }
+
                         if (attempt == 3) {
                             throw e;
                         }
 
                         try {
-                            Thread.sleep(300);
+                            Thread.sleep(1000);
                         } catch (InterruptedException ignored) {}
                     }
                 }
@@ -400,13 +405,15 @@ public class DistCrawler {
                     }
                 }
 
-                connection.disconnect();
-
             } catch (Exception e) {
                 System.out.println("Worker " + rank + " couldn't access the URL: " + e.getMessage());
+            } finally {
+                if (connection != null) {
+                    connection.disconnect();
+                }
             }
 
-            //Number of unique linsk found on the page stored in ana rray
+            //Number of unique links found on the page stored in an array
             int[] linkCount = {foundLinks.size()};
 
             //Joining links into a string

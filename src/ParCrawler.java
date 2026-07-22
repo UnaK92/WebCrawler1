@@ -66,13 +66,18 @@ public class ParCrawler {
                         }
 
                         //If queue is empty, but another thread is working wait
-                        try { Thread.sleep(20);
+                        try {
+                            Thread.sleep(20);
                         } catch (InterruptedException ignored) {}
                         continue;
                     }
 
+                    //Mark worker as active
+                    activeWorkers.incrementAndGet();
+
                     //Automatically mark URLs as visited
                     if (!visited.add(currentURL)) {
+                        activeWorkers.decrementAndGet();
                         continue;
                     }
 
@@ -82,13 +87,10 @@ public class ParCrawler {
                         System.out.println("Processed " + count + " pages");
                     }
 
-                    //Mark worker as active
-                    activeWorkers.incrementAndGet();
-
                     //Convert string URL into java URL object, with no connection currently and -1 response code (no code received)
+                    HttpURLConnection conn = null;
                     try {
                         URL objURL = new URL(currentURL);
-                        HttpURLConnection conn = null;
                         int code = -1;
 
                         //Try to connect to each URL up to 3 times, URL & HTTP connection creation + request
@@ -96,18 +98,23 @@ public class ParCrawler {
                             try {
                                 conn = (HttpURLConnection) objURL.openConnection();
                                 conn.setRequestMethod("GET");
-                                conn.setConnectTimeout(10000);
-                                conn.setReadTimeout(15000);
+                                conn.setConnectTimeout(20000);
+                                conn.setReadTimeout(30000);
 
                                 code = conn.getResponseCode();
                                 break;
                             } catch (Exception ex) {
+                                if (conn != null) {
+                                    conn.disconnect();
+                                    conn = null;
+                                }
+
                                 if (attempt == 3) {
                                     throw ex;
                                 }
 
                                 try {
-                                    Thread.sleep(300);
+                                    Thread.sleep(1000);
                                 } catch (InterruptedException ignored) {}
                             }
                         }
@@ -185,6 +192,9 @@ public class ParCrawler {
                     } catch (Exception e) {
                         brokenLinks.add(currentURL + " (Error: " + e.getMessage() + ")");
                     } finally {
+                        if (conn != null) {
+                            conn.disconnect();
+                        }
                         activeWorkers.decrementAndGet(); //Always after done decrease active worker count
                     }
                 }
